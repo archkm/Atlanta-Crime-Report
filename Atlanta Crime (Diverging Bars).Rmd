@@ -1,0 +1,66 @@
+---
+title: "Atlanta Crime Report"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(shinythemes)
+fluidPage(theme = shinytheme("cyborg"))
+
+crime_atlanta <- read.csv("D:\\PGD Data Science\\Term 2\\Data Visualization\\Datasets\\Crime in Atlanta 2009-2017\\Crime in Atlanta 2009-2017.csv")
+```
+
+Select the Crime Type {.sidebar}
+=======================================================================
+
+```{r}
+selectInput(inputId = "Crime", label = "Select the Crime Type", 
+            choices = c("All", as.character(unique(crime_atlanta$crime))))
+```
+
+Summary of Crime in Atlanta
+=======================================================================
+Column
+-----------------------------------------------------------------------
+
+### Summary of Crime in Atlanta for Each Month
+
+```{r}
+crime_atlanta$date <- as.Date(crime_atlanta$date, format = "%m/%d/%Y")
+crime_atlanta$Month <- format(crime_atlanta$date, "%b")
+
+renderPlotly({
+  
+  Crime <- {
+    if (input$Crime == "All")
+    {
+      Crime <- crime_atlanta
+    }else
+    {
+      Crime <- filter(crime_atlanta, crime_atlanta$crime == input$Crime)
+    }
+    Crime
+  } 
+  
+  CrimeMonthwise <- Crime %>% group_by(Month) %>% summarise(Total_Crimes = n())
+  
+  CrimeMonthwise$Z_Score <- round(((CrimeMonthwise$Total_Crimes) - mean(CrimeMonthwise$Total_Crimes))/sd(CrimeMonthwise$Total_Crimes), 2)
+  
+  CrimeMonthwise$Avg_Type <- ifelse(CrimeMonthwise$Z_Score < 0, "Below", "Above")
+  
+  CrimeMonthwise <- CrimeMonthwise %>% arrange(Z_Score)
+  
+  DivPlot <- ggplot(CrimeMonthwise, aes(x = Month, y = Z_Score)) + geom_bar(stat = "identity", aes(fill = Avg_Type, width = 0.5)) + scale_x_discrete(limits = month.abb) + scale_fill_manual(name = "Crime", labels = c("Above Average", "Below Average"), values = c("Above" = "Red", "Below" = "Blue")) + labs(title = "Monthwise Crime Report", subtitle = "Monthwise Crime Report Based on Average Crime", captions = "Source: Data.World", y = "Normalized Crime Rate") + theme_classic()
+  ggplotly(DivPlot)
+  
+})
+```
